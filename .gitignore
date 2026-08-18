@@ -14,3 +14,6 @@ artifacts/raw/
 uploads/
 tmp/
 *.tmp
+node_modules/
+.next/
+*.tsbuildinfo
