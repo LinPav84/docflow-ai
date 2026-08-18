@@ -15,8 +15,7 @@ Document
 → Line Items processing
 → Deterministic Normalization
 → Validation Engine
-→ Confidence / Review decision
-→ Human Review
+→ Human Review State
 → Approval
 → JSON / CSV / XLSX / ERP-ready export
 → Audit trail
@@ -26,7 +25,39 @@ Business logic, canonical schemas, normalization, validation, state transitions,
 and auditability belong in Python and the application database. n8n may be added
 later as an orchestration layer, but it is not the product architecture.
 
-## Current milestone: Validation Engine v1
+## Current milestone: Human Review State v1
+
+The immutable human-review domain workflow is:
+
+```text
+REVIEW
+→ raw correction
+→ existing deterministic normalization
+→ immediate revalidation
+→ PASS
+→ explicit human approval
+→ VERIFIED
+```
+
+`start_review()` translates an existing validation decision into an explicit
+`ReviewStatus`. `apply_correction()` accepts only supported document or indexed
+line-item field paths, records an append-only raw-value correction, rebuilds the
+frozen document through `normalize_document()`, and immediately calls
+`validate_document()`. Successful corrections increment the revision exactly once;
+failed paths or normalization errors leave the prior session unchanged.
+
+`approve_review()` performs a fresh validation check and only permits explicit
+approval when the current effective document is `PASS`. **PASS and VERIFIED are not
+the same state**: PASS is a machine validation outcome, while VERIFIED records a
+separate human approval action. Any later correction removes VERIFIED status and
+requires another explicit approval. Row count and source order cannot be changed by
+the v1 correction API.
+
+This milestone contains backend domain logic only. It adds no UI, authentication,
+database audit trail, user identity, confidence scoring, AI correction, exports, or
+row add/delete operations.
+
+## Validation Engine v1
 
 `docflow.validate_document(document)` applies deterministic accounting checks to an
 immutable `NormalizedDocument` and returns an immutable `ValidationResult` with a
@@ -66,8 +97,8 @@ path-aware `LineItemMappingError`.
 Line-item mapping makes no accounting decisions: it does not sort, deduplicate,
 merge, infer, calculate, correct OCR text, or convert numbers. Deterministic
 normalization remains responsible for conversions such as raw numeric strings to
-`Decimal`; the future Validation Engine will own required-field, arithmetic, VAT,
-duplicate, and business-consistency checks.
+`Decimal`; the Validation Engine owns the implemented required-field, arithmetic,
+VAT, and business-consistency checks.
 
 ## Upload / ingestion
 
@@ -232,6 +263,6 @@ and unapproved confidential documents must never be committed. Unit tests use
 
 ## Roadmap
 
-Confidence scoring, human review, and export remain later milestones. Confidence
-scoring is **not implemented** and must not be fabricated without trustworthy source
-confidence values.
+Human Review UI, authentication, database audit storage, confidence scoring, and
+export remain later milestones. Confidence scoring is **not implemented** and must
+not be fabricated without trustworthy source confidence values.

@@ -32,6 +32,18 @@ from docflow.nutrient import (
     NutrientNetworkError,
     NutrientTimeoutError,
 )
+from docflow.review import (
+    ApprovalNotAllowedError,
+    CorrectionValueError,
+    InvalidCorrectionPathError,
+    ReviewCorrection,
+    ReviewError,
+    ReviewSession,
+    ReviewStatus,
+    apply_correction,
+    approve_review,
+    start_review,
+)
 from docflow.schemas import FORM_Z2_EXTRACTION_INSTRUCTIONS, FORM_Z2_EXTRACTION_SCHEMA
 from docflow.validation import (
     ABSOLUTE_TOLERANCE,
@@ -45,6 +57,8 @@ from docflow.validation import (
 )
 
 __all__ = [
+    "ApprovalNotAllowedError",
+    "CorrectionValueError",
     "FileTooLargeError",
     "FORM_Z2_EXTRACTION_INSTRUCTIONS",
     "FORM_Z2_EXTRACTION_SCHEMA",
@@ -55,6 +69,7 @@ __all__ = [
     "IngestionPersistenceError",
     "IngestionResult",
     "IngestionService",
+    "InvalidCorrectionPathError",
     "LineItemMappingError",
     "MappedLineItem",
     "NormalizationError",
@@ -69,6 +84,10 @@ __all__ = [
     "NutrientNetworkError",
     "NutrientTimeoutError",
     "RELATIVE_TOLERANCE",
+    "ReviewCorrection",
+    "ReviewError",
+    "ReviewSession",
+    "ReviewStatus",
     "UnreadableFileError",
     "UnsupportedFileTypeError",
     "UnsupportedMimeTypeError",
@@ -77,7 +96,10 @@ __all__ = [
     "ValidationReasonCode",
     "ValidationResult",
     "ValidationSeverity",
+    "apply_correction",
+    "approve_review",
     "map_line_items_from_extraction",
     "normalize_document",
+    "start_review",
     "validate_document",
 ]
