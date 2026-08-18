@@ -1,0 +1,43 @@
+{
+  "status": 200,
+  "requestId": "req-sintech-run-b",
+  "output": {
+    "data": {
+      "buyer_name": "Некоммерческое акционерное общество \"Haileybury Almaty\"",
+      "buyer_tax_id": "",
+      "currency": "KZT",
+      "document_date": "2026-06-23",
+      "document_number": "139",
+      "grand_total": "167 881,00",
+      "line_items": [
+        {
+          "line_number": "1",
+          "line_total": "167 881,00",
+          "product_description": "ИБП APC SRV1KI (SRV1KI/On-Line/Easy/Tower/MEC/1000VA/800W",
+          "quantity": "1",
+          "sku": "00000002498",
+          "unit": "шт",
+          "unit_price": "167 881,00",
+          "vat_amount": "23 156,00"
+        }
+      ],
+      "responsible_person": "Койлыбаева Ж.Н.",
+      "subtotal": "167 881,00",
+      "supplier_name": "Товарищество с ограниченной ответственностью «Sintech»",
+      "supplier_tax_id": "170840022944",
+      "vat_total": "23 156,00"
+    },
+    "metadata": {},
+    "pages": [
+      {
+        "page": 1,
+        "width": 1200,
+        "height": 1697
+      }
+    ]
+  },
+  "metrics": {
+    "processingTimeMs": 4800,
+    "pagesProcessed": 1
+  }
+}
