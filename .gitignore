@@ -10,3 +10,7 @@ venv/
 !.env.example
 dist/
 build/
+artifacts/raw/
+uploads/
+tmp/
+*.tmp

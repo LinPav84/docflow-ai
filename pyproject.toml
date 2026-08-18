@@ -5,10 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "docflow-ai"
 version = "0.1.0"
-description = "Deterministic accounting document normalization for DocFlow AI"
+description = "Traceable accounting document ingestion and normalization for DocFlow AI"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+  "httpx>=0.27,<1",
+]
 
 [project.optional-dependencies]
 dev = [

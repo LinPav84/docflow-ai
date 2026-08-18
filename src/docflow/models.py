@@ -1,7 +1,9 @@
-"""Typed results produced by deterministic normalization."""
+"""Typed domain results for DocFlow AI."""
 
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
+from pathlib import Path
 from typing import Generic, TypeVar
 
 T = TypeVar("T")
@@ -50,3 +52,26 @@ class NormalizedDocument:
     supplier_name: TextValue
     supplier_tax_id: TextValue
     vat_total: DecimalValue
+
+
+@dataclass(frozen=True, slots=True)
+class IngestionMetadata:
+    """Immutable metadata captured at the document ingestion boundary."""
+
+    document_id: str
+    original_filename: str
+    mime_type: str
+    file_size_bytes: int
+    ingested_at: datetime
+    provider: str
+    provider_status: int
+    raw_response_path: Path
+    provider_request_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class IngestionResult:
+    """A successful ingestion and the provider JSON preserved for downstream use."""
+
+    metadata: IngestionMetadata
+    raw_response: object
