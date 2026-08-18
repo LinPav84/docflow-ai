@@ -59,6 +59,22 @@ class ReviewError(ValueError):
     """Base class for controlled review-domain failures."""
 
 
+class StaleValidationError(ReviewError):
+    """The supplied validation result does not match the current document."""
+
+    def __init__(
+        self,
+        supplied_decision: ValidationDecision,
+        fresh_decision: ValidationDecision,
+    ) -> None:
+        self.supplied_decision = supplied_decision
+        self.fresh_decision = fresh_decision
+        super().__init__(
+            "supplied validation result does not match fresh document validation; "
+            f"supplied={supplied_decision.value}, fresh={fresh_decision.value}"
+        )
+
+
 class InvalidCorrectionPathError(ReviewError):
     """The requested correction path is unsupported or unavailable."""
 
@@ -118,11 +134,15 @@ def start_review(
     if not isinstance(validation_result, ValidationResult):
         raise TypeError("validation_result must be a ValidationResult")
 
+    fresh_validation = validate_document(document)
+    if fresh_validation != validation_result:
+        raise StaleValidationError(validation_result.decision, fresh_validation.decision)
+
     now = (clock or _utc_now)()
     return ReviewSession(
         document=document,
-        validation_result=validation_result,
-        status=_status_from_decision(validation_result.decision),
+        validation_result=fresh_validation,
+        status=_status_from_decision(fresh_validation.decision),
         corrections=(),
         revision=0,
         created_at=now,

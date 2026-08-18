@@ -1,5 +1,6 @@
 import json
-from dataclasses import FrozenInstanceError
+from copy import deepcopy
+from dataclasses import FrozenInstanceError, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -11,8 +12,12 @@ from docflow import (
     CorrectionValueError,
     InvalidCorrectionPathError,
     ReviewStatus,
+    StaleValidationError,
     ValidationDecision,
+    ValidationIssue,
+    ValidationReasonCode,
     ValidationResult,
+    ValidationSeverity,
     apply_correction,
     approve_review,
     normalize_document,
@@ -98,22 +103,83 @@ def test_review_document_cannot_be_approved() -> None:
         approve_review(session)
 
 
-def test_stale_or_fabricated_pass_cannot_bypass_revalidation() -> None:
+def test_matching_review_result_creates_review_session() -> None:
+    document = normalize_document(_valid_payload(currency=None))
+    validation_result = validate_document(document)
+
+    session = start_review(document, validation_result, clock=_clock(CREATED_AT))
+
+    assert validation_result.decision is ValidationDecision.REVIEW
+    assert session.status is ReviewStatus.REVIEW
+    assert session.validation_result == validation_result
+
+
+def test_review_document_with_fabricated_pass_is_rejected() -> None:
     document = normalize_document(_valid_payload(currency=None))
     fabricated_pass = ValidationResult(decision=ValidationDecision.PASS, issues=())
-    session = start_review(document, fabricated_pass, clock=_clock(CREATED_AT))
+
+    with pytest.raises(StaleValidationError) as error:
+        start_review(document, fabricated_pass, clock=_clock(CREATED_AT))
+
+    assert error.value.supplied_decision is ValidationDecision.PASS
+    assert error.value.fresh_decision is ValidationDecision.REVIEW
+
+
+def test_pass_document_with_fabricated_review_is_rejected() -> None:
+    document = normalize_document(_valid_payload())
+    fabricated_review = ValidationResult(decision=ValidationDecision.REVIEW, issues=())
+
+    with pytest.raises(StaleValidationError) as error:
+        start_review(document, fabricated_review, clock=_clock(CREATED_AT))
+
+    assert error.value.supplied_decision is ValidationDecision.REVIEW
+    assert error.value.fresh_decision is ValidationDecision.PASS
+
+
+def test_same_decision_with_different_issue_set_is_rejected() -> None:
+    document = normalize_document(_valid_payload(currency=None))
+    different_issue = ValidationIssue(
+        reason_code=ValidationReasonCode.REQUIRED_FIELD_MISSING,
+        field_path="document_number",
+        message="different issue",
+        severity=ValidationSeverity.WARNING,
+        expected="present",
+        actual=None,
+    )
+    fabricated_review = ValidationResult(
+        decision=ValidationDecision.REVIEW,
+        issues=(different_issue,),
+    )
+
+    with pytest.raises(StaleValidationError) as error:
+        start_review(document, fabricated_review, clock=_clock(CREATED_AT))
+
+    assert error.value.supplied_decision is error.value.fresh_decision
+
+
+def test_failed_start_review_does_not_mutate_inputs_or_create_state() -> None:
+    document = normalize_document(_valid_payload(currency=None))
+    original_document = deepcopy(document)
+    fabricated_pass = ValidationResult(decision=ValidationDecision.PASS, issues=())
+    original_result = deepcopy(fabricated_pass)
+
+    def unexpected_clock() -> datetime:
+        raise AssertionError("clock must not run for rejected initialization")
+
+    with pytest.raises(StaleValidationError):
+        start_review(document, fabricated_pass, clock=unexpected_clock)
+
+    assert document == original_document
+    assert fabricated_pass == original_result
+
+
+def test_approval_retains_stale_validation_defense_in_depth() -> None:
+    session = _session()
+    changed_document = normalize_document(_valid_payload(currency=None))
+    stale_session = replace(session, document=changed_document)
 
     with pytest.raises(ApprovalNotAllowedError, match="stale"):
-        approve_review(session)
-
-
-def test_validation_fail_maps_to_failed_review_status() -> None:
-    document = normalize_document(_valid_payload())
-    failed = ValidationResult(decision=ValidationDecision.FAIL, issues=())
-
-    session = start_review(document, failed, clock=_clock(CREATED_AT))
-
-    assert session.status is ReviewStatus.FAILED
+        approve_review(stale_session)
 
 
 def test_arithmetic_error_starts_in_review() -> None:

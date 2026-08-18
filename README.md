@@ -39,12 +39,14 @@ REVIEW
 → VERIFIED
 ```
 
-`start_review()` translates an existing validation decision into an explicit
-`ReviewStatus`. `apply_correction()` accepts only supported document or indexed
-line-item field paths, records an append-only raw-value correction, rebuilds the
-frozen document through `normalize_document()`, and immediately calls
-`validate_document()`. Successful corrections increment the revision exactly once;
-failed paths or normalization errors leave the prior session unchanged.
+`start_review()` freshly validates the document and rejects a supplied validation
+result unless its decision and complete ordered issue set match exactly. A review
+session therefore cannot begin with stale or fabricated validation state.
+`apply_correction()` accepts only supported document or indexed line-item field
+paths, records an append-only raw-value correction, rebuilds the frozen document
+through `normalize_document()`, and immediately calls `validate_document()`.
+Successful corrections increment the revision exactly once; failed paths or
+normalization errors leave the prior session unchanged.
 
 `approve_review()` performs a fresh validation check and only permits explicit
 approval when the current effective document is `PASS`. **PASS and VERIFIED are not
