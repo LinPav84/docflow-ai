@@ -10,6 +10,11 @@ from docflow.ingestion import (
     UnsupportedFileTypeError,
     UnsupportedMimeTypeError,
 )
+from docflow.line_items import (
+    LineItemMappingError,
+    MappedLineItem,
+    map_line_items_from_extraction,
+)
 from docflow.models import (
     IngestionMetadata,
     IngestionResult,
@@ -39,6 +44,8 @@ __all__ = [
     "IngestionPersistenceError",
     "IngestionResult",
     "IngestionService",
+    "LineItemMappingError",
+    "MappedLineItem",
     "NormalizationError",
     "NormalizedDocument",
     "NormalizedLineItem",
@@ -53,5 +60,6 @@ __all__ = [
     "UnreadableFileError",
     "UnsupportedFileTypeError",
     "UnsupportedMimeTypeError",
+    "map_line_items_from_extraction",
     "normalize_document",
 ]

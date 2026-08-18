@@ -11,7 +11,8 @@ review state, and auditability.
 Document
 → Upload / Ingestion
 → Nutrient DWS extraction
-→ Canonical Mapping
+→ Extraction Mapping
+→ Line Items processing
 → Deterministic Normalization
 → Validation
 → Confidence / Review decision
@@ -25,7 +26,28 @@ Business logic, canonical schemas, normalization, validation, state transitions,
 and auditability belong in Python and the application database. n8n may be added
 later as an orchestration layer, but it is not the product architecture.
 
-## Current milestone: upload / ingestion
+## Current milestone: Line Items v1
+
+`docflow.map_line_items_from_extraction(response_json)` is the structural boundary
+between Nutrient's schema-based `/extract` response and downstream normalization.
+It reads only `output.data.line_items` and returns an immutable tuple of
+`MappedLineItem` rows.
+
+This layer preserves source order, duplicate rows, and exact raw field values. Each
+row receives a zero-based `source_index` and a stable `source_path`, such as
+`line_items[0]`; `field_path(name)` derives paths such as
+`line_items[0].quantity`. Missing or null `line_items` maps to an empty tuple,
+missing row fields remain `None`, and unknown provider fields are ignored. Malformed
+envelopes, non-list `line_items`, and non-object rows raise a controlled,
+path-aware `LineItemMappingError`.
+
+Line-item mapping makes no accounting decisions: it does not sort, deduplicate,
+merge, infer, calculate, correct OCR text, or convert numbers. Deterministic
+normalization remains responsible for conversions such as raw numeric strings to
+`Decimal`; the future Validation Engine will own required-field, arithmetic, VAT,
+duplicate, and business-consistency checks. The Validation Engine has not started.
+
+## Upload / ingestion
 
 The ingestion layer accepts one local document, validates it at the boundary,
 assigns a UUID document ID, calls the official Nutrient DWS Data Extraction API,
@@ -188,6 +210,6 @@ and unapproved confidential documents must never be committed. Unit tests use
 
 ## Roadmap
 
-Canonical mapping, validation, confidence scoring, human review, and export remain
-later milestones. The **Validation Engine is not implemented** and must not begin
-until the appropriate preceding milestones are externally reviewed and approved.
+Validation, confidence scoring, human review, and export remain later milestones.
+The **Validation Engine is not implemented** and must not begin until the appropriate
+preceding milestones are externally reviewed and approved.
