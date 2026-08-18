@@ -18,14 +18,106 @@ Document
 → Human Review State
 → Approval
 → Audit trail
-→ JSON / CSV / XLSX / ERP-ready export
+→ VERIFIED-only JSON / CSV export
 ```
 
 Business logic, canonical schemas, normalization, validation, state transitions,
 and auditability belong in Python and the application database. n8n may be added
 later as an orchestration layer, but it is not the product architecture.
 
-## Current milestone: Export Layer v1
+## Current milestone: Demo UI v1
+
+Demo UI v1 is a credential-free, single-page demonstration of the complete DocFlow
+review lifecycle. A lightweight FastAPI bridge owns one in-memory fixture session;
+the Next.js App Router frontend renders only backend state and submits user actions.
+Python remains the source of truth for normalization, deterministic validation,
+review transitions, explicit approval, audit events, and exports.
+
+```text
+apps/web (Next.js / React / TypeScript)
+        ↓ HTTP on localhost
+docflow.api (FastAPI transport)
+        ↓ controlled immutable-state replacement
+docflow.demo (fixture lifecycle orchestration)
+        ↓ existing functions only
+normalization → validation → review → audit → export
+```
+
+### Run locally
+
+Python 3.11+ and Node.js 20.9+ are required. From the repository root, install and
+start the backend:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[dev]'
+python -m uvicorn docflow.api:app --reload --port 8000
+```
+
+In a second terminal, start the frontend:
+
+```bash
+cd apps/web
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000). The frontend uses
+`http://localhost:8000` by default; set `NEXT_PUBLIC_DOCFLOW_API_URL` before the
+frontend command only when the local API runs elsewhere. Development CORS is
+restricted to `localhost:3000` and `127.0.0.1:3000`, not a wildcard.
+
+### Demo Fixture Mode
+
+**Load demo document** uses the checked-in real Sintech schema-extraction response,
+so it needs no Nutrient key or network access. The demo service deliberately changes
+only the first line total from `167 881,00` to `167 981,00`. Existing Python domain
+functions then produce `LINE_TOTAL_MISMATCH` and `GRAND_TOTAL_MISMATCH` honestly.
+
+The API keeps one document in memory for a single-process hackathon demo. It uses a
+lock and replaces immutable `ReviewSession` and `AuditTrail` snapshots; it is not a
+database or production persistence layer. **Reset demo** reconstructs the original
+REVIEW scenario, revision zero, and its four initial audit events. Restarting the API
+also loses current demo state. Live Nutrient upload is intentionally not included.
+
+### Demo API
+
+- `GET /api/health` — fixture-mode health check;
+- `POST /api/demo/start` — load a fresh REVIEW fixture lifecycle;
+- `POST /api/demo/reset` — restore the intentional REVIEW state;
+- `GET /api/demo/state` — read the current in-memory state;
+- `POST /api/demo/correct` — submit `field_path` and `raw_value` to `apply_correction()`;
+- `POST /api/demo/verify` — call `approve_review()` for a PASS session;
+- `GET /api/demo/export/json` — canonical VERIFIED-only JSON;
+- `GET /api/demo/export/csv` — VERIFIED-only flat line-item CSV.
+
+The UI does not contain accounting validation rules. Corrections are never patched
+locally: each response is the new Python-owned session, validation result, revision,
+and audit trail. Before VERIFIED, both export endpoints return a controlled rejection.
+
+### Judge demo script
+
+1. Click **Load demo document**.
+2. Observe **REVIEW** and two accounting issues.
+3. Correct the line total to `167 881,00` and click **Apply correction**.
+4. Observe **PASS**; note that the document is not VERIFIED yet.
+5. Click **Verify document**.
+6. Observe **VERIFIED** and the explicit approval confirmation.
+7. Inspect the eight-event audit trail, including old/new correction values.
+8. Download canonical JSON and flat CSV.
+9. Click **Reset demo** to restore the starting scenario for another run.
+
+### Screenshots
+
+Screenshots can be added after external review under `docs/screenshots/`. The app
+already provides dedicated upload, REVIEW, PASS, and VERIFIED states for recording.
+
+Demo UI v1 does not add authentication, users, persistence, Supabase, billing,
+dashboards, document lists, 1C/ERP integration, XLSX, n8n, confidence scoring, AI
+correction, multi-document state, or complex PDF rendering.
+
+## Export Layer v1
 
 Export Layer v1 exposes pure in-memory exports for explicitly VERIFIED documents:
 
@@ -45,9 +137,10 @@ safe audit representation in deterministic event order. CSV uses Python's standa
 `csv` module, fixed column order, RFC-style quoting, Unicode text, and one row per
 source-order line item.
 
-This milestone writes no files. XLSX, downloads, HTTP APIs, frontend, database,
-Supabase, n8n, 1C/ERP connectors, confidence scoring, AI, and PDF export are not
-implemented.
+The export domain functions write no files. Demo UI v1 now exposes them through
+credential-free HTTP download routes after VERIFIED; XLSX, server-side file
+persistence, database storage, Supabase, n8n, 1C/ERP connectors, confidence scoring,
+AI, and PDF export remain unimplemented.
 
 ## Audit Trail v1
 
@@ -309,6 +402,7 @@ and unapproved confidential documents must never be committed. Unit tests use
 
 ## Roadmap
 
-Human Review UI, authentication, database audit storage, confidence scoring, and
-export remain later milestones. Confidence scoring is **not implemented** and must
-not be fabricated without trustworthy source confidence values.
+Authentication, production persistence, database audit storage, live multi-document
+workflows, XLSX, and ERP integrations remain later milestones. Confidence scoring is
+**not implemented** and must not be fabricated without trustworthy source confidence
+values.
