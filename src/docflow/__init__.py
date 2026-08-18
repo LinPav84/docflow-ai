@@ -27,9 +27,12 @@ from docflow.nutrient import (
     NutrientNetworkError,
     NutrientTimeoutError,
 )
+from docflow.schemas import FORM_Z2_EXTRACTION_INSTRUCTIONS, FORM_Z2_EXTRACTION_SCHEMA
 
 __all__ = [
     "FileTooLargeError",
+    "FORM_Z2_EXTRACTION_INSTRUCTIONS",
+    "FORM_Z2_EXTRACTION_SCHEMA",
     "IngestionConfigurationError",
     "IngestionError",
     "IngestionMetadata",

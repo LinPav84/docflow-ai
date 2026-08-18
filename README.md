@@ -43,13 +43,32 @@ configured size limit are rejected before the provider request. The original
 filename is retained as metadata and is never used as document identity.
 
 The Nutrient-specific HTTP code is isolated in `docflow.nutrient.NutrientClient`.
-It follows Nutrient's current Data Extraction contract:
+Nutrient exposes two distinct Data Extraction paths:
+
+- **Parse** (`/extraction/parse`) returns full-document Markdown or spatial structure;
+- **Extract** (`/extraction/extract`) returns business fields shaped by a supplied JSON Schema.
+
+DocFlow uses **Extract** because the current pipeline requires Form Z-2 accounting
+fields rather than a spatial document representation. It follows Nutrient's
+current multipart contract:
 
 ```text
-POST https://api.nutrient.io/extraction/parse
+POST https://api.nutrient.io/extraction/extract
 multipart: file + instructions
-instructions: {"mode":"understand","output":{"format":"spatial"}}
+instructions: {
+  "schema": { ... },
+  "parseConfig": {"mode":"understand"},
+  "instructions": "document-level extraction guidance"
+}
 ```
+
+The initial schema lives in `docflow.schemas`, outside the HTTP client. It declares
+the approved Form Z-2 header, line-item, and total fields as strings so identifiers
+keep leading zeroes and locale-formatted accounting values remain available to the
+deterministic normalization layer. Fields are optional and the extraction guidance
+explicitly forbids inference, calculation, semantic correction, row merging, or
+invented values. `IngestionService` accepts a different schema, instructions, and
+parse mode when a later approved document type requires them.
 
 The service uses an explicit timeout, handles authentication and HTTP failures,
 and never includes the API key in controlled exception messages.
@@ -143,8 +162,9 @@ python -m ruff check .
 python -m ruff format --check .
 ```
 
-The primary real extraction fixture is
-`fixtures/nutrient/sintech_run_b.json`.
+The approved Run B data fixture is `fixtures/nutrient/sintech_run_b.json`. A
+schema-based `/extract` response envelope containing the same data is available at
+`fixtures/nutrient/sintech_extract_response.json` for mocked ingestion tests.
 
 ## Optional manual smoke test
 

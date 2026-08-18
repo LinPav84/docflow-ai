@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
 
-NUTRIENT_PARSE_URL = "https://api.nutrient.io/extraction/parse"
-_PARSE_INSTRUCTIONS = {"mode": "understand", "output": {"format": "spatial"}}
+NUTRIENT_EXTRACT_URL = "https://api.nutrient.io/extraction/extract"
 
 
 class NutrientError(RuntimeError):
@@ -66,14 +66,14 @@ class NutrientResponse:
 
 
 class NutrientClient:
-    """Send one document to the official Data Extraction parse endpoint."""
+    """Send one document to the official schema-based Data Extraction endpoint."""
 
     def __init__(
         self,
         *,
         http_client: httpx.Client | None = None,
         timeout_seconds: float = 60.0,
-        endpoint: str = NUTRIENT_PARSE_URL,
+        endpoint: str = NUTRIENT_EXTRACT_URL,
     ) -> None:
         if timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be positive")
@@ -87,10 +87,19 @@ class NutrientClient:
         *,
         mime_type: str,
         api_key: str,
+        schema: Mapping[str, object],
+        instructions: str | None = None,
+        mode: str = "understand",
     ) -> NutrientResponse:
         """Upload a document and return its unmodified response bytes plus parsed JSON."""
         headers = {"Authorization": f"Bearer {api_key}"}
-        data = {"instructions": json.dumps(_PARSE_INSTRUCTIONS, separators=(",", ":"))}
+        outer_instructions: dict[str, object] = {
+            "schema": schema,
+            "parseConfig": {"mode": mode},
+        }
+        if instructions:
+            outer_instructions["instructions"] = instructions
+        data = {"instructions": json.dumps(outer_instructions, separators=(",", ":"))}
 
         try:
             with file_path.open("rb") as document:

@@ -1,4 +1,8 @@
-from collections.abc import Callable, Iterator
+import json
+from collections.abc import Callable, Iterator, Mapping
+from email import policy
+from email.message import Message
+from email.parser import BytesParser
 from pathlib import Path
 from uuid import UUID
 
@@ -6,6 +10,8 @@ import httpx
 import pytest
 
 from docflow import (
+    FORM_Z2_EXTRACTION_INSTRUCTIONS,
+    FORM_Z2_EXTRACTION_SCHEMA,
     FileTooLargeError,
     IngestionConfigurationError,
     IngestionService,
@@ -23,9 +29,8 @@ from docflow import (
 PDF_BYTES = b"%PDF-1.7\nsynthetic test document"
 JPG_BYTES = b"\xff\xd8\xff\xe0synthetic test image"
 PNG_BYTES = b"\x89PNG\r\n\x1a\nsynthetic test image"
-SUCCESS_BODY = (
-    b'{ "status": 200, "requestId": "req-success", "output": {"elements": [{"text": "raw"}]} }\n'
-)
+FIXTURES_DIR = Path(__file__).parents[1] / "fixtures" / "nutrient"
+SUCCESS_BODY = (FIXTURES_DIR / "sintech_extract_response.json").read_bytes()
 
 Handler = Callable[[httpx.Request], httpx.Response]
 ServiceFactory = Callable[..., IngestionService]
@@ -40,6 +45,9 @@ def service_factory(tmp_path: Path) -> Iterator[ServiceFactory]:
         *,
         environ: dict[str, str] | None = None,
         max_file_size_bytes: int = 1024,
+        extraction_schema: Mapping[str, object] = FORM_Z2_EXTRACTION_SCHEMA,
+        extraction_instructions: str | None = FORM_Z2_EXTRACTION_INSTRUCTIONS,
+        extraction_mode: str = "understand",
     ) -> IngestionService:
         http_client = httpx.Client(transport=httpx.MockTransport(handler))
         clients.append(http_client)
@@ -48,6 +56,9 @@ def service_factory(tmp_path: Path) -> Iterator[ServiceFactory]:
             raw_artifacts_dir=tmp_path / "raw",
             max_file_size_bytes=max_file_size_bytes,
             environ={"NUTRIENT_API_KEY": "test-api-key"} if environ is None else environ,
+            extraction_schema=extraction_schema,
+            extraction_instructions=extraction_instructions,
+            extraction_mode=extraction_mode,
         )
 
     yield make
@@ -63,6 +74,17 @@ def _write(tmp_path: Path, filename: str, content: bytes) -> Path:
 
 def _success(_: httpx.Request) -> httpx.Response:
     return httpx.Response(200, content=SUCCESS_BODY)
+
+
+def _multipart_parts(request: httpx.Request) -> dict[str, Message]:
+    headers = (
+        f"Content-Type: {request.headers['content-type']}\r\nMIME-Version: 1.0\r\n\r\n"
+    ).encode()
+    message = BytesParser(policy=policy.default).parsebytes(headers + request.content)
+    return {
+        str(part.get_param("name", header="content-disposition")): part
+        for part in message.iter_parts()
+    }
 
 
 @pytest.mark.parametrize(
@@ -131,17 +153,16 @@ def test_success_returns_metadata_and_preserves_exact_raw_json(
     assert result.metadata.file_size_bytes == len(PDF_BYTES)
     assert result.metadata.provider == "nutrient_dws"
     assert result.metadata.provider_status == 200
-    assert result.metadata.provider_request_id == "req-success"
+    assert result.metadata.provider_request_id == "req-sintech-run-b"
     assert result.metadata.ingested_at.tzinfo is not None
     assert result.metadata.raw_response_path == (
         tmp_path / "raw" / result.metadata.document_id / "nutrient_response.json"
     )
     assert result.metadata.raw_response_path.read_bytes() == SUCCESS_BODY
-    assert result.raw_response == {
-        "status": 200,
-        "requestId": "req-success",
-        "output": {"elements": [{"text": "raw"}]},
-    }
+    assert result.raw_response == json.loads(SUCCESS_BODY)
+    assert isinstance(result.raw_response, dict)
+    expected_run_b = json.loads((FIXTURES_DIR / "sintech_run_b.json").read_bytes())
+    assert result.raw_response["output"]["data"] == expected_run_b
 
 
 def test_missing_api_key_is_controlled_and_makes_no_request(
@@ -156,23 +177,59 @@ def test_missing_api_key_is_controlled_and_makes_no_request(
         service_factory(unexpected_request, environ={}).ingest(document)
 
 
-def test_official_parse_request_shape_is_used(
+def test_official_extract_request_shape_and_form_z2_schema_are_used(
     service_factory: ServiceFactory, tmp_path: Path
 ) -> None:
     document = _write(tmp_path, "invoice.pdf", PDF_BYTES)
 
     def inspect_request(request: httpx.Request) -> httpx.Response:
-        body = request.content
-        assert request.url == "https://api.nutrient.io/extraction/parse"
+        parts = _multipart_parts(request)
+        assert request.url == "https://api.nutrient.io/extraction/extract"
         assert request.headers["authorization"] == "Bearer test-api-key"
         assert request.headers["content-type"].startswith("multipart/form-data;")
-        assert b'name="file"; filename="invoice.pdf"' in body
-        assert b"Content-Type: application/pdf" in body
-        assert b'name="instructions"' in body
-        assert b'{"mode":"understand","output":{"format":"spatial"}}' in body
+        assert set(parts) == {"file", "instructions"}
+        assert parts["file"].get_filename() == "invoice.pdf"
+        assert parts["file"].get_content_type() == "application/pdf"
+        assert parts["file"].get_payload(decode=True) == PDF_BYTES
+
+        instructions_payload = parts["instructions"].get_payload(decode=True)
+        assert instructions_payload is not None
+        outer_instructions = json.loads(instructions_payload)
+        assert outer_instructions == {
+            "schema": FORM_Z2_EXTRACTION_SCHEMA,
+            "parseConfig": {"mode": "understand"},
+            "instructions": FORM_Z2_EXTRACTION_INSTRUCTIONS,
+        }
         return httpx.Response(200, content=SUCCESS_BODY)
 
     service_factory(inspect_request).ingest(document)
+
+
+def test_extraction_schema_instructions_and_mode_are_configurable(
+    service_factory: ServiceFactory, tmp_path: Path
+) -> None:
+    document = _write(tmp_path, "invoice.pdf", PDF_BYTES)
+    custom_schema: dict[str, object] = {
+        "type": "object",
+        "properties": {"custom_field": {"type": "string"}},
+    }
+
+    def inspect_request(request: httpx.Request) -> httpx.Response:
+        payload = _multipart_parts(request)["instructions"].get_payload(decode=True)
+        assert payload is not None
+        assert json.loads(payload) == {
+            "schema": custom_schema,
+            "parseConfig": {"mode": "structure"},
+            "instructions": "Extract the custom field exactly as printed.",
+        }
+        return httpx.Response(200, content=SUCCESS_BODY)
+
+    service_factory(
+        inspect_request,
+        extraction_schema=custom_schema,
+        extraction_instructions="Extract the custom field exactly as printed.",
+        extraction_mode="structure",
+    ).ingest(document)
 
 
 @pytest.mark.parametrize("status_code", [401, 403])

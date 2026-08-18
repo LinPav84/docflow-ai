@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from collections.abc import Callable, Mapping
 from contextlib import suppress
+from copy import deepcopy
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -12,6 +13,7 @@ from uuid import UUID, uuid4
 
 from docflow.models import IngestionMetadata, IngestionResult
 from docflow.nutrient import NutrientClient
+from docflow.schemas import FORM_Z2_EXTRACTION_INSTRUCTIONS, FORM_Z2_EXTRACTION_SCHEMA
 
 DEFAULT_MAX_FILE_SIZE_MB = Decimal("10")
 DEFAULT_RAW_ARTIFACTS_DIR = Path("artifacts/raw")
@@ -63,6 +65,9 @@ class IngestionService:
         raw_artifacts_dir: Path = DEFAULT_RAW_ARTIFACTS_DIR,
         max_file_size_bytes: int | None = None,
         environ: Mapping[str, str] | None = None,
+        extraction_schema: Mapping[str, object] = FORM_Z2_EXTRACTION_SCHEMA,
+        extraction_instructions: str | None = FORM_Z2_EXTRACTION_INSTRUCTIONS,
+        extraction_mode: str = "understand",
         id_factory: Callable[[], UUID] = uuid4,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
@@ -76,6 +81,9 @@ class IngestionService:
         )
         if self._max_file_size_bytes <= 0:
             raise IngestionConfigurationError("maximum file size must be positive")
+        self._extraction_schema = deepcopy(dict(extraction_schema))
+        self._extraction_instructions = extraction_instructions
+        self._extraction_mode = extraction_mode
         self._id_factory = id_factory
         self._clock = clock or (lambda: datetime.now(UTC))
 
@@ -93,6 +101,9 @@ class IngestionService:
             path,
             mime_type=mime_type,
             api_key=api_key,
+            schema=self._extraction_schema,
+            instructions=self._extraction_instructions,
+            mode=self._extraction_mode,
         )
         raw_response_path = self._persist_raw_response(document_id, provider_response.raw_body)
 
