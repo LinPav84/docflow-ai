@@ -17,15 +17,35 @@ Document
 → Validation Engine
 → Human Review State
 → Approval
-→ JSON / CSV / XLSX / ERP-ready export
 → Audit trail
+→ JSON / CSV / XLSX / ERP-ready export
 ```
 
 Business logic, canonical schemas, normalization, validation, state transitions,
 and auditability belong in Python and the application database. n8n may be added
 later as an orchestration layer, but it is not the product architecture.
 
-## Current milestone: Human Review State v1
+## Current milestone: Audit Trail v1
+
+Audit Trail v1 provides a document-scoped, append-only `AuditTrail` containing an
+immutable tuple of typed `AuditEvent` records. Events use UUID identifiers,
+timezone-aware UTC timestamps, contiguous sequences starting at 1, and explicit
+review revisions. Appending an event returns a new trail; previous events and trail
+objects remain unchanged.
+
+Typed immutable payloads record only lifecycle facts needed for traceability:
+ingestion metadata, extraction completion, ordered validation reason codes, review
+start state, exact correction raw values, explicit approval, and the resulting
+VERIFIED state. Events never contain API keys, source bytes, authorization headers,
+or complete provider responses. All events in one trail must share the same
+ingestion document ID, and correction revisions cannot move backwards.
+
+`audit_trail_to_dict()` prepares an ordered JSON-safe in-memory representation with
+UTC ISO timestamps and safe Decimal strings. It does not write files. Audit Trail v1
+is domain logic only and remains in memory; database persistence, migrations, audit
+viewer UI, identities, permissions, and exports are later milestones.
+
+## Human Review State v1
 
 The immutable human-review domain workflow is:
 
