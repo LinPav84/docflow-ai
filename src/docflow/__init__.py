@@ -33,11 +33,22 @@ from docflow.nutrient import (
     NutrientTimeoutError,
 )
 from docflow.schemas import FORM_Z2_EXTRACTION_INSTRUCTIONS, FORM_Z2_EXTRACTION_SCHEMA
+from docflow.validation import (
+    ABSOLUTE_TOLERANCE,
+    RELATIVE_TOLERANCE,
+    ValidationDecision,
+    ValidationIssue,
+    ValidationReasonCode,
+    ValidationResult,
+    ValidationSeverity,
+    validate_document,
+)
 
 __all__ = [
     "FileTooLargeError",
     "FORM_Z2_EXTRACTION_INSTRUCTIONS",
     "FORM_Z2_EXTRACTION_SCHEMA",
+    "ABSOLUTE_TOLERANCE",
     "IngestionConfigurationError",
     "IngestionError",
     "IngestionMetadata",
@@ -57,9 +68,16 @@ __all__ = [
     "NutrientInvalidResponseError",
     "NutrientNetworkError",
     "NutrientTimeoutError",
+    "RELATIVE_TOLERANCE",
     "UnreadableFileError",
     "UnsupportedFileTypeError",
     "UnsupportedMimeTypeError",
+    "ValidationDecision",
+    "ValidationIssue",
+    "ValidationReasonCode",
+    "ValidationResult",
+    "ValidationSeverity",
     "map_line_items_from_extraction",
     "normalize_document",
+    "validate_document",
 ]

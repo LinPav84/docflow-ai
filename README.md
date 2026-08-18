@@ -14,7 +14,7 @@ Document
 → Extraction Mapping
 → Line Items processing
 → Deterministic Normalization
-→ Validation
+→ Validation Engine
 → Confidence / Review decision
 → Human Review
 → Approval
@@ -26,7 +26,29 @@ Business logic, canonical schemas, normalization, validation, state transitions,
 and auditability belong in Python and the application database. n8n may be added
 later as an orchestration layer, but it is not the product architecture.
 
-## Current milestone: Line Items v1
+## Current milestone: Validation Engine v1
+
+`docflow.validate_document(document)` applies deterministic accounting checks to an
+immutable `NormalizedDocument` and returns an immutable `ValidationResult` with a
+`PASS`, `REVIEW`, or `FAIL` decision plus ordered, path-aware issues. Current
+user-correctable problems produce `REVIEW`; `FAIL` is reserved for structurally
+unusable validation inputs and is intentionally rare.
+
+Validation v1 checks required document and line-item fields, currency presence,
+12-ASCII-digit Kazakhstan tax ID formatting, positive quantities, line arithmetic,
+grand-total reconciliation, and VAT-total reconciliation. All arithmetic uses
+`Decimal`, never `float`. Monetary comparisons pass when the absolute difference is
+at most `0.02` **or** the relative difference is at most `0.0001` (0.01%); zero
+expected values use the absolute rule safely. Form Z-2 grand total is the sum of
+listed line totals, with VAT already included and never added again.
+
+Checks never mutate, infer, calculate missing inputs, correct, or normalize the
+source document. Issue order is deterministic: document requirements, tax IDs,
+line items in source order, grand total, then VAT total. AI/provider confidence
+scoring is **not implemented** because the normalized models do not contain a
+trustworthy confidence signal.
+
+## Line Items v1
 
 `docflow.map_line_items_from_extraction(response_json)` is the structural boundary
 between Nutrient's schema-based `/extract` response and downstream normalization.
@@ -45,7 +67,7 @@ Line-item mapping makes no accounting decisions: it does not sort, deduplicate,
 merge, infer, calculate, correct OCR text, or convert numbers. Deterministic
 normalization remains responsible for conversions such as raw numeric strings to
 `Decimal`; the future Validation Engine will own required-field, arithmetic, VAT,
-duplicate, and business-consistency checks. The Validation Engine has not started.
+duplicate, and business-consistency checks.
 
 ## Upload / ingestion
 
@@ -210,6 +232,6 @@ and unapproved confidential documents must never be committed. Unit tests use
 
 ## Roadmap
 
-Validation, confidence scoring, human review, and export remain later milestones.
-The **Validation Engine is not implemented** and must not begin until the appropriate
-preceding milestones are externally reviewed and approved.
+Confidence scoring, human review, and export remain later milestones. Confidence
+scoring is **not implemented** and must not be fabricated without trustworthy source
+confidence values.
