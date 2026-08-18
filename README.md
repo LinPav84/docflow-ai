@@ -25,7 +25,31 @@ Business logic, canonical schemas, normalization, validation, state transitions,
 and auditability belong in Python and the application database. n8n may be added
 later as an orchestration layer, but it is not the product architecture.
 
-## Current milestone: Audit Trail v1
+## Current milestone: Export Layer v1
+
+Export Layer v1 exposes pure in-memory exports for explicitly VERIFIED documents:
+
+- `export_verified_json(session, audit_trail)` returns a canonical structured object;
+- `export_verified_csv(session)` returns flat line-item CSV text with document context
+  repeated on every row.
+
+PASS alone is not exportable. Both functions require `ReviewStatus.VERIFIED`, a PASS
+validation result, and a fresh defensive validation match. JSON additionally
+requires an audit trail ending in `DOCUMENT_VERIFIED` at the same review revision.
+Stale, tampered, or mismatched state is rejected with controlled export errors.
+
+Accounting fields use normalized values. Identifiers remain strings, missing values
+become JSON `null` or empty CSV cells, and every `Decimal` is rendered as a plain
+non-scientific string without converting through `float`. JSON embeds the existing
+safe audit representation in deterministic event order. CSV uses Python's standard
+`csv` module, fixed column order, RFC-style quoting, Unicode text, and one row per
+source-order line item.
+
+This milestone writes no files. XLSX, downloads, HTTP APIs, frontend, database,
+Supabase, n8n, 1C/ERP connectors, confidence scoring, AI, and PDF export are not
+implemented.
+
+## Audit Trail v1
 
 Audit Trail v1 provides a document-scoped, append-only `AuditTrail` containing an
 immutable tuple of typed `AuditEvent` records. Events use UUID identifiers,
