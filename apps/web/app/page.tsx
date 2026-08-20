@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, DragEvent, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 type Status = "REVIEW" | "PASS" | "VERIFIED" | "FAILED";
 
@@ -128,7 +128,6 @@ function StatusBadge({ status }: { status: Status }) {
 
 export default function Home() {
   const [state, setState] = useState<DemoState | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [processingStage, setProcessingStage] = useState<string | null>(null);
   const [correction, setCorrection] = useState("167 881,00");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -158,28 +157,6 @@ export default function Home() {
       setProcessingStage(null);
       setIsSubmitting(false);
     }
-  }
-
-  function handleFile(event: ChangeEvent<HTMLInputElement>) {
-    setSelectedFile(event.target.files?.[0] ?? null);
-    setError(null);
-  }
-
-  function handleDrop(event: DragEvent<HTMLLabelElement>) {
-    event.preventDefault();
-    const file = event.dataTransfer.files[0];
-    if (file) {
-      setSelectedFile(file);
-      setError(null);
-    }
-  }
-
-  function processSelectedFile() {
-    setError(
-      selectedFile
-        ? "Live upload is not enabled in Demo UI v1. Use the credential-free demo document."
-        : "Choose a PDF, JPG, or PNG first.",
-    );
   }
 
   async function applyCorrection() {
@@ -286,25 +263,23 @@ export default function Home() {
           </p>
 
           <div className="upload-card">
-            <label
-              className="drop-zone"
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={handleDrop}
-            >
-              <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFile} />
-              <span className="upload-icon" aria-hidden="true">↑</span>
-              <strong>{selectedFile ? selectedFile.name : "Drop a document here"}</strong>
-              <span>{selectedFile ? "Ready to process" : "or choose a file from your computer"}</span>
-              <small>PDF, JPG or PNG · up to 10 MB</small>
-            </label>
-            <div className="upload-actions">
-              <button className="button button-primary" onClick={processSelectedFile}>
-                Process document
-              </button>
-              <span className="or-divider">or</span>
-              <button className="button button-secondary" onClick={loadDemo} disabled={isSubmitting}>
+            <div className="demo-entry">
+              <div className="demo-entry-label">FULL PRODUCT WALKTHROUGH</div>
+              <button className="button button-primary demo-primary" onClick={loadDemo} disabled={isSubmitting}>
                 <span aria-hidden="true">▶</span> Load demo document
               </button>
+              <p>Run the complete credential-free review flow</p>
+            </div>
+
+            <div className="capability-divider" aria-hidden="true">
+              <span>Future capability</span>
+            </div>
+
+            <div className="drop-zone drop-zone-disabled" aria-disabled="true">
+              <span className="upload-icon" aria-hidden="true">↑</span>
+              <strong>Upload your document</strong>
+              <span>Coming soon — live document processing</span>
+              <small>PDF, JPG or PNG</small>
             </div>
           </div>
 
